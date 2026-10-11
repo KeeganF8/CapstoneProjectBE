@@ -9,9 +9,15 @@ namespace CapstoneProjectBE.Data
         {
         }
 
-        public  DbSet<Career> Careers  { get; set; }
+        public DbSet<Career> Careers { get; set; }
         public DbSet<Skill> Skills { get; set; }
         public DbSet<CareerSkill> CareerSkills { get; set; }
+
+        public DbSet<LearningResource> LearningResources { get; set; }
+        public DbSet<LearningRoadmap> LearningRoadmaps { get; set; }
+        public DbSet<RoadmapItem> RoadmapItems { get; set; }
+        public DbSet<RoadmapItemResource> RoadmapItemResources { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -35,9 +41,60 @@ namespace CapstoneProjectBE.Data
             modelBuilder.Entity<CareerSkill>(entity =>
             {
                 entity.HasKey(careerSkill => careerSkill.CareerSkillID);
-                entity.HasIndex(careerSkill => new {careerSkill.CareerID, careerSkill.SkillID}).IsUnique();
+                entity.HasIndex(careerSkill => new { careerSkill.CareerID, careerSkill.SkillID }).IsUnique();
                 entity.HasOne(careerSkill => careerSkill.Career).WithMany(career => career.CareerSkills).HasForeignKey(careerSkill => careerSkill.CareerID);
                 entity.HasOne(careerSkill => careerSkill.Skill).WithMany(skill => skill.CareerSkills).HasForeignKey(careerSkill => careerSkill.SkillID);
+            });
+
+            modelBuilder.Entity<LearningRoadmap>(entity =>
+            {
+
+                entity.HasKey(roadmap => roadmap.RoadmapID);
+                entity.Property(roadmap => roadmap.Title).HasMaxLength(150).IsRequired();
+                entity.HasOne(roadmap => roadmap.Career).WithMany().HasForeignKey(roadmap => roadmap.CareerID);
+                entity.Property(roadmap => roadmap.ProgressPercentage).HasPrecision(5,2);
+
+            });
+
+            modelBuilder.Entity<RoadmapItem>(entity =>
+            {
+                entity.HasKey(item => item.RoadmapItemID);
+                entity.Property(item => item.Title).HasMaxLength(150).IsRequired();
+
+                entity.HasOne(item => item.Roadmap)
+                .WithMany(roadmap => roadmap.Items)
+                .HasForeignKey(item => item.RoadmapID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(item => item.Skill).WithMany().HasForeignKey(item => item.SkillID);
+
+                entity.HasIndex(item => new { item.RoadmapID, item.StepOrder}).IsUnique();
+                
+            });
+
+            modelBuilder.Entity<LearningResource>(entity =>
+            {
+                entity.HasKey(resource => resource.ResourceID);
+                entity.Property(resource => resource.ResourceName).HasMaxLength(200).IsRequired();
+                entity.Property(resource => resource.Url).HasMaxLength(500).IsRequired();
+
+                entity.HasOne(resource => resource.Skill).WithMany().HasForeignKey(resource => resource.SkillID);
+
+                entity.HasIndex(resource => resource.SkillID);
+            });
+
+            modelBuilder.Entity<RoadmapItemResource>(entity =>
+            {
+                entity.HasKey(link => link.RoadmapItemResourceID);
+
+                entity.HasOne(link => link.RoadmapItem)
+                .WithMany(item => item.Resources)
+                .HasForeignKey(link => link.RoadmapItemID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(link => link.LearningResource).WithMany().HasForeignKey(link => link.ResourceID);
+
+                entity.HasIndex(link => new { link.RoadmapItemID, link.ResourceID}).IsUnique();
             });
 
             //temp data

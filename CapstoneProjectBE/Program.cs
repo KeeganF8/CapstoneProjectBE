@@ -22,6 +22,7 @@ builder.Services.AddSwaggerGen();
 
 //Register service
 builder.Services.AddScoped<ICareerService, CareerService>();
+builder.Services.AddScoped<ILearningResourceService, LearningResourceService>();
 
 var app = builder.Build();
 
