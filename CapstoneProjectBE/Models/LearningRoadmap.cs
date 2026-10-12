@@ -10,6 +10,7 @@ namespace CapstoneProjectBE.Models
        public Career Career {get; set; } = null!;
 
        public Guid UserID { get; set; }
+       public User User { get; set; } = null!;
 
        public string Title { get; set; } = string.Empty;
 
