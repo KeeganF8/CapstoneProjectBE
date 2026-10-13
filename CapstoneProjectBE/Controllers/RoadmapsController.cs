@@ -66,5 +66,45 @@ namespace CapstoneProjectBE.Controllers
             var roadmaps = await _roadmapService.GetRoadmapForUserAsync(TempUserID);
             return Ok(roadmaps);
         }
+
+        //GET /api/roadmaps/current
+        [HttpGet("current")]
+        public async Task<ActionResult<RoadmapDto>> GetCurrentRoadmap()
+        {
+            var roadmap = await _roadmapService.GetCurrentRoadmapAsync(TempUserID);
+
+            if (roadmap == null)
+            {
+                return NotFound();
+            }
+            return Ok(roadmap);
+        }
+
+        //POST /api/roadmaps/items/{itemID}/reosurces/{resourceID}/complete
+        [HttpPost("items/{itemID}/resources/{resourceID}/complete")]
+        public async Task<ActionResult<CompleteResourceResultDto>> CompleteResource (Guid itemID, Guid resourceID)
+        {
+            var result = await _roadmapService.CompleteResourceAsync(itemID, resourceID);
+
+            if (result == null)
+            {
+                return NotFound();
+            }
+            return Ok(result);
+        }
+
+        //POST /api/roadmaps/generate
+        [HttpPost("generate")]
+        public async Task<ActionResult<RoadmapDto>> GenerateRoadmap(GenerateRoadmapDto request)
+        {
+            var roadmap = await _roadmapService.GenerateRoadmapAsync(TempUserID, request.CareerID);
+
+            if (roadmap == null)
+            {
+                return NotFound();
+            }
+
+            return CreatedAtAction(nameof(GenerateRoadmap), new { id = roadmap.RoadmapID}, roadmap);
+        }
     }
 }

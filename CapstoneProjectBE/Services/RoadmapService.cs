@@ -3,6 +3,7 @@ using CapstoneProjectBE.DTOs.Roadmaps;
 using CapstoneProjectBE.DTOs.Resources;
 using CapstoneProjectBE.Data;
 using Microsoft.EntityFrameworkCore;
+using CapstoneProjectBE.Models;
 
 
 namespace CapstoneProjectBE.Services
@@ -144,6 +145,183 @@ namespace CapstoneProjectBE.Services
             })
             .ToListAsync();
             
+        }
+
+        //GET /api/roadmaps/current
+        public async Task<RoadmapDto?> GetCurrentRoadmapAsync (Guid userID)
+        {
+            //current = roadmap user worked on most recently
+            var currentID = await _context.LearningRoadmaps
+            .AsNoTracking()
+            .Where(roadmap => roadmap.UserID == userID)
+            .OrderByDescending(roadmap => roadmap.UpdatedAt)
+            .Select(roadmap => (Guid?)roadmap.RoadmapID)
+            .FirstOrDefaultAsync();
+
+            if (currentID == null )
+            {
+                return null;
+            }
+            return await GetRoadmapByIdAsync(currentID.Value);
+        }
+
+        //POST /api/roadmaps/items/{itemID}/resources/{resourceID}/complete
+        //updates progress only, does not verify skill
+        public async Task<CompleteResourceResultDto?> CompleteResourceAsync(Guid roadmapItemID, Guid resourceID)
+        {
+            //get resource link and its step
+            var link = await _context.RoadmapItemResources
+            .Include(link => link.RoadmapItem)
+            .FirstOrDefaultAsync(link => link.RoadmapItemID == roadmapItemID && link.ResourceID == resourceID);
+
+            if (link == null)
+            {
+                return null;
+            }
+
+            var item = link.RoadmapItem;
+            var roadmapID = item.RoadmapID;
+            var now = DateTime.UtcNow;
+
+            //mark resource complete
+            //keep original date if already done
+            if (!link.IsCompleted)
+            {
+                link.IsCompleted = true;
+                link.CompletedAt = now;
+                await _context.SaveChangesAsync();
+            }
+
+            //step status is completed when all its resources are done
+            var anyLeft = await _context.RoadmapItemResources
+            .AnyAsync(l => l.RoadmapItemID == item.RoadmapItemID && !l.IsCompleted);
+
+            if (!anyLeft && item.Status != "completed")
+            {
+                item.Status = "completed";
+                item.CompletedAt = now;
+            }
+             else if (anyLeft && item.Status == "not_started") 
+            {
+                item.Status = "in_progress";
+            }
+            
+            //update roadmap progress
+            //counts all resources across every step in roadmap
+            var total = await _context.RoadmapItemResources
+            .CountAsync(l =>  l.RoadmapItem.RoadmapID == roadmapID);
+
+            //only counts the ticked ones
+            var completed = await _context.RoadmapItemResources
+            .CountAsync(l => l.RoadmapItem.RoadmapID == roadmapID && l.IsCompleted);
+
+            var roadmap = await _context.LearningRoadmaps
+            .FirstAsync(roadmap => roadmap.RoadmapID == roadmapID);
+
+            roadmap.ProgressPercentage = Math.Round(completed * 100m/total, 2);
+            roadmap.UpdatedAt = now;
+
+            //saves step status and roadmap progress together
+            await _context.SaveChangesAsync();
+
+            return new CompleteResourceResultDto
+            {
+                RoadmapItemResourceID = link.RoadmapItemResourceID,
+                IsCompleted = link.IsCompleted,
+                CompletedAt = link.CompletedAt,
+                RoadmapItemID = item.RoadmapItemID,
+                ItemStatus = item.Status,
+                RoadmapID = roadmapID,
+                ProgressPercentage = roadmap.ProgressPercentage
+            };
+
+        }
+
+        //POST /api/roadmaps/generate
+        //TODO: skip skills user already has from CV assessment 
+        public async Task<RoadmapDto?> GenerateRoadmapAsync(Guid userID, Guid careerID)
+        {
+            //get career + its skills
+            //most important first
+            var career = await _context.Careers
+            .AsNoTracking()
+            .Where(career => career.CareerID == careerID)
+            .Select(career => new
+            {
+                career.CareerName,
+                Skills = career.CareerSkills
+                .OrderByDescending(cs => cs.IsCoreSkill)
+                .ThenByDescending(cs => cs.ImportanceLevel)
+                .Select(cs => new { cs.SkillID, cs.Skill.SkillName, cs.ImportanceLevel })
+                .ToList()
+            })
+            .FirstOrDefaultAsync();
+
+            if (career == null)
+            {
+                return null;
+            }
+
+            //gets active resources for skill
+            var skillIDs = career.Skills.Select(skill => skill.SkillID).ToList();
+
+            var resources = await _context.LearningResources
+            .AsNoTracking()
+            .Where(resource => skillIDs.Contains(resource.SkillID) && resource.IsActive)
+            .Select(resource => new { resource.ResourceID, resource.SkillID, resource.ResourceName})
+            .ToListAsync();
+
+            var now = DateTime.UtcNow;
+
+            //create the roadmap
+            var roadmap = new LearningRoadmap
+            {
+                UserID = userID,
+                CareerID = careerID,
+                Title = $"{career.CareerName} Roadmap",
+                ProgressPercentage = 0,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            //one step per skill with all its active resources
+            var stepOrder = 1;
+
+            foreach(var skill in career.Skills)
+            {
+                var item = new RoadmapItem
+                {
+                    SkillID = skill.SkillID,
+                    Title = "$Learn {skill.SkillName}",
+                    StepOrder = stepOrder++,
+                    Priority = skill.ImportanceLevel >= 4 ? "high"
+                    : skill.ImportanceLevel == 3 ? "medium"
+                    : "low",
+                    Status = "not_started"
+                };
+
+                var skillResources = resources
+                .Where(resource => resource.SkillID == skill.SkillID)
+                .OrderBy(resource => resource.ResourceName);
+
+                foreach (var resource in skillResources)
+                {
+                    item.Resources.Add(new RoadmapItemResource
+                    {
+                        ResourceID = resource.ResourceID,
+                        IsCompleted = false
+                    });
+                }
+
+                roadmap.Items.Add(item);
+
+            }
+            //save roadmap, steps, and resource links together
+            _context.LearningRoadmaps.Add(roadmap);
+            await _context.SaveChangesAsync();
+
+            return await GetRoadmapByIdAsync(roadmap.RoadmapID);
+
         }
 
     }

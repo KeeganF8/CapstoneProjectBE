@@ -20,5 +20,13 @@ namespace CapstoneProjectBE.Services.Interfaces
         //all roadmaps for a user, newest first
         Task<List<RoadmapSummaryDto>> GetRoadmapForUserAsync (Guid userID);
 
+        //user's most recently updated roadmap with steps
+        Task<RoadmapDto?> GetCurrentRoadmapAsync (Guid userID);
+
+        //marks resource as complete, updates step status and progress
+        Task<CompleteResourceResultDto?> CompleteResourceAsync (Guid roadmapItemID, Guid resourceID);
+
+        //creates roadmap from career's skills
+        Task<RoadmapDto?> GenerateRoadmapAsync (Guid userID, Guid careerID);
     }
 }
