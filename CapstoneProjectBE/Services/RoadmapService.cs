@@ -292,7 +292,7 @@ namespace CapstoneProjectBE.Services
                 var item = new RoadmapItem
                 {
                     SkillID = skill.SkillID,
-                    Title = "$Learn {skill.SkillName}",
+                    Title = $"Learn {skill.SkillName}",
                     StepOrder = stepOrder++,
                     Priority = skill.ImportanceLevel >= 4 ? "high"
                     : skill.ImportanceLevel == 3 ? "medium"
@@ -302,7 +302,14 @@ namespace CapstoneProjectBE.Services
 
                 var skillResources = resources
                 .Where(resource => resource.SkillID == skill.SkillID)
-                .OrderBy(resource => resource.ResourceName);
+                .OrderBy(resource => resource.ResourceName)
+                .Take(3) //3 resources per step
+                .ToList();
+
+                if (skillResources.Count == 0)
+                {
+                    throw new InvalidOperationException ($"Skill {skill.SkillName} has no active resources ");
+                }
 
                 foreach (var resource in skillResources)
                 {
