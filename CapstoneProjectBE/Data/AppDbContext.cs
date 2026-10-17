@@ -9,12 +9,18 @@ namespace CapstoneProjectBE.Data
         {
         }
 
-        public  DbSet<Career> Careers  { get; set; }
+        public DbSet<Career> Careers { get; set; }
         public DbSet<Skill> Skills { get; set; }
         public DbSet<CareerSkill> CareerSkills { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<UserProfile> UserProfiles { get; set; }
         public DbSet<EmailVerification> EmailVerifications { get; set; }
+
+        public DbSet<LearningResource> LearningResources { get; set; }
+        public DbSet<LearningRoadmap> LearningRoadmaps { get; set; }
+        public DbSet<RoadmapItem> RoadmapItems { get; set; }
+        public DbSet<RoadmapItemResource> RoadmapItemResources { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -129,6 +135,204 @@ namespace CapstoneProjectBE.Data
                     .HasForeignKey(careerSkill => careerSkill.SkillID)
                     .OnDelete(DeleteBehavior.Cascade)
                     .HasConstraintName("career_skills_skill_id_fkey");
+            });
+
+            modelBuilder.Entity<LearningRoadmap>(entity =>
+            {
+
+                entity.ToTable("learning_roadmaps");
+
+                entity.HasKey(roadmap => roadmap.RoadmapID);
+
+                entity.Property(roadmap => roadmap.RoadmapID)
+                .HasColumnName("roadmap_id")
+                .HasDefaultValueSql("gen_random_uuid()");
+
+                entity.Property(roadmap => roadmap.UserID)
+                .HasColumnName("user_id");
+
+                entity.Property(roadmap => roadmap.CareerID)
+                .HasColumnName("career_id");
+
+                entity.Property(roadmap => roadmap.Title)
+                .HasColumnName("title")
+                .HasMaxLength(150)
+                .IsRequired();
+
+                entity.Property(roadmap => roadmap.ProgressPercentage)
+                .HasColumnName("progress_percentage")
+                .HasPrecision(5,2);
+
+                entity.Property(roadmap => roadmap.CreatedAt)
+                .HasColumnName("created_at")
+                .HasColumnType("timestamp with time zone")
+                .HasDefaultValueSql("now()");
+
+                entity.Property(roadmap => roadmap.UpdatedAt)
+                .HasColumnName("updated_at")
+                .HasColumnType("timestamp with time zone")
+                .HasDefaultValueSql("now()");
+
+                entity.HasOne(roadmap => roadmap.Career)
+                .WithMany()
+                .HasForeignKey(roadmap => roadmap.CareerID);
+
+                entity.HasOne(roadmap => roadmap.User)
+                .WithMany()
+                .HasForeignKey(roadmap => roadmap.UserID)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("learning_roadmaps_user_id_fkey");
+
+            });
+
+
+            modelBuilder.Entity<RoadmapItem>(entity =>
+            {
+                entity.ToTable("roadmap_items");
+                entity.HasKey(item => item.RoadmapItemID);
+
+                entity.Property(item => item.RoadmapItemID)
+                .HasColumnName("roadmap_item_id")
+                .HasDefaultValueSql("gen_random_uuid()");
+
+                entity.Property(item => item.RoadmapID)
+                .HasColumnName("roadmap_id");
+
+                entity.Property(item => item.SkillID)
+                .HasColumnName("skill_id");
+
+                entity.Property(item => item.Title)
+                .HasColumnName("title")
+                .HasMaxLength(150)
+                .IsRequired();
+
+                entity.Property(item => item.Description)
+                .HasColumnName("description");
+
+                entity.Property(item => item.StepOrder)
+                .HasColumnName("step_order");
+
+                entity.Property(item => item.Priority)
+                .HasColumnName("priority");
+
+                entity.Property(item => item.Status)
+                .HasColumnName("status");
+
+                entity.Property(item => item.TargetDate)
+                .HasColumnName("target_date")
+                .HasColumnType("date");
+
+                entity.Property(item => item.CompletedAt)
+                .HasColumnName("completed_at")
+                .HasColumnType("timestamp with time zone");
+
+                entity.HasIndex(item => new { item.RoadmapID, item.StepOrder})
+                .IsUnique();
+
+                entity.HasOne(item => item.Roadmap)
+                .WithMany(roadmap => roadmap.Items)
+                .HasForeignKey(item => item.RoadmapID)
+                .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(item => item.Skill)
+                .WithMany()
+                .HasForeignKey(item => item.SkillID);
+
+            
+                
+            });
+
+            modelBuilder.Entity<LearningResource>(entity =>
+            {
+                entity.ToTable("learning_resources");
+
+                entity.HasKey(resource => resource.ResourceID);
+
+                entity.Property(resource => resource.ResourceID)
+                .HasColumnName("resource_id")
+                .HasDefaultValueSql("gen_random_uuid()");
+
+                entity.Property(resource => resource.SkillID)
+                .HasColumnName("skill_id");
+
+                entity.Property(resource => resource.ResourceName)
+                .HasColumnName("resource_name")
+                .HasMaxLength(200)
+                .IsRequired();
+                
+                entity.Property(resource => resource.ResourceType)
+                .HasColumnName("resource_type");
+
+                entity.Property(resource => resource.Url)
+                .HasColumnName("url")
+                .HasMaxLength(500)
+                .IsRequired();
+
+                entity.Property(resource => resource.Provider)
+                .HasColumnName("provider");
+
+                entity.Property(resource => resource.DifficultyLevel)
+                .HasColumnName("difficulty_level");
+
+                entity.Property(resource => resource.CostType)
+                .HasColumnName("cost_type");
+
+                entity.Property(resource => resource.EstDuration)
+                .HasColumnName("est_duration");
+
+                entity.Property(resource => resource.Description)
+                .HasColumnName("description");
+
+                entity.Property(resource => resource.SourceType)
+                .HasColumnName("source_type");
+
+                entity.Property(resource => resource.IsActive)
+                .HasColumnName("is_active");
+
+                entity.HasIndex(resource => resource.SkillID);
+
+                entity.HasOne(resource => resource.Skill)
+                .WithMany()
+                .HasForeignKey(resource => resource.SkillID);
+
+                
+            });
+
+            modelBuilder.Entity<RoadmapItemResource>(entity =>
+            {
+                entity.ToTable("roadmap_item_resources");
+
+                entity.HasKey(link => link.RoadmapItemResourceID);
+
+                entity.Property(link => link.RoadmapItemResourceID)
+                .HasColumnName("roadmap_item_resource_id")
+                .HasDefaultValueSql("gen_random_uuid()");
+
+               entity.Property(link => link.RoadmapItemID)
+               .HasColumnName("roadmap_item_id");
+
+                entity.Property(link => link.ResourceID)
+               .HasColumnName("resource_id");
+
+                entity.Property(link => link.IsCompleted)
+               .HasColumnName("is_completed");
+
+                entity.Property(link => link.CompletedAt)
+               .HasColumnName("completed_at")
+               .HasColumnType("timestamp with time zone");
+
+               entity.HasIndex(link => new { link.RoadmapItemID, link.ResourceID})
+               .IsUnique();
+
+               entity.HasOne(link => link.RoadmapItem)
+               .WithMany(item => item.Resources)
+               .HasForeignKey(link => link.RoadmapItemID)
+               .OnDelete(DeleteBehavior.Cascade);
+
+               entity.HasOne(link => link.LearningResource)
+               .WithMany()
+               .HasForeignKey(link => link.ResourceID);
+               
             });
 
             //temp data
